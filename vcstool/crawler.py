@@ -1,17 +1,24 @@
 import os
+import re
 
 from . import vcstool_clients
 
 
 def find_repositories(paths, nested=False):
+    current_directory = os.curdir
+    vcs_ignore_path = os.path.join(current_directory, ".vcsignore")
+    exclude_list = []
+    if os.path.exists(vcs_ignore_path):
+        exclude_list = [line.rstrip('\n') for line in open(vcs_ignore_path)]
+
     repos = []
     visited = []
     for path in paths:
-        _find_repositories(path, repos, visited, nested=nested)
+        _find_repositories(path, repos, visited, exclude_list, nested=nested)
     return repos
 
 
-def _find_repositories(path, repos, visited, nested=False):
+def _find_repositories(path, repos, visited, exclude, nested=False):
     abs_path = os.path.abspath(path)
     if abs_path in visited:
         return
@@ -28,10 +35,11 @@ def _find_repositories(path, repos, visited, nested=False):
     except OSError:
         listdir = []
     for name in sorted(listdir):
-        subpath = os.path.join(path, name)
-        if not os.path.isdir(subpath):
-            continue
-        _find_repositories(subpath, repos, visited, nested=nested)
+        if True not in [re.search(regex, name).span(0)[1] != 0 for regex in exclude]:
+            subpath = os.path.join(path, name)
+            if not os.path.isdir(subpath):
+                continue
+            _find_repositories(subpath, repos, visited, exclude, nested=nested)
 
 
 def get_vcs_client(path):
